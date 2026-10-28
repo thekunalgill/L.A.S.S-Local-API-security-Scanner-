@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f3ed">
+  <title>L.A.S.S. | Local API Security Scanner</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="L.A.S.S. home"><span class="brand-mark">L</span><span>L.A.S.S.<small>LOCAL API SECURITY SCANNER</small></span></a>
+    <div class="local-indicator"><span></span> LOCAL MODE <span class="mono">· 127.0.0.1 ONLY</span></div>
+  </header>
+
+  <main>
+    <section id="auth-panel" class="auth-panel">
+      <div class="auth-box">
+        <div class="eyebrow"><span class="eyebrow-line"></span> SECURE ACCESS</div>
+        <h2>Local sign in</h2>
+        <p>Use the local administrator account to access the scanner dashboard.</p>
+        <form id="login-form" class="login-form">
+          <label for="login-username">Username</label>
+          <input id="login-username" name="username" type="text" value="admin" required>
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" required>
+          <button type="submit">Sign in</button>
+          <p id="auth-error" class="auth-error" hidden></p>
+        </form>
+      </div>
+    </section>
+
+    <section id="app-shell" class="app-shell" hidden>
+      <div class="topbar-user">
+        <span id="user-chip">Signed in</span>
+        <button id="logout-button" type="button" class="logout-button">Log out</button>
+      </div>
+    <section class="intro">
+      <div class="eyebrow"><span class="eyebrow-line"></span> PRE-DEPLOYMENT CHECK</div>
+      <h1>Know what your<br>API is sending back.</h1>
+      <p>Run a quick health and security-header check against an API on this machine. No public targets, no redirect following.</p>
+    </section>
+
+    <section class="scanner" aria-labelledby="scan-title">
+      <div class="section-heading"><div><span class="step">01</span><h2 id="scan-title">New scan</h2></div><span class="section-note">AUTHORIZED LOCAL TARGETS</span></div>
+      <form id="scan-form">
+        <label for="target">API endpoint</label>
+        <div class="input-row"><span class="input-prefix">↗</span><input id="target" name="target" type="url" placeholder="http://127.0.0.1:8000/health" required autocomplete="url"><button id="scan-button" type="submit"><span>Run scan</span><span aria-hidden="true">→</span></button></div>
+        <p class="form-hint">Only <code>localhost</code> and loopback IPs are accepted. Requests use GET and stop at redirects.</p>
+        <p id="form-error" class="form-error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <section id="result" class="result" aria-live="polite" hidden></section>
+
+    <section class="history-section" aria-labelledby="history-title">
+      <div class="section-heading"><div><span class="step">02</span><h2 id="history-title">Recent scans</h2></div><button id="refresh-button" class="icon-button" type="button" title="Refresh scan history" aria-label="Refresh scan history">↻</button></div>
+      <div class="history-table-wrap"><table><thead><tr><th>TARGET</th><th>STATUS</th><th>LATENCY</th><th>SCORE</th><th>SCANNED</th><th></th></tr></thead><tbody id="history-body"><tr><td class="empty-state" colspan="6">No scans yet. Start with a local endpoint above.</td></tr></tbody></table></div>
+    </section>
+    </section>
+  </main>
+  <footer><span>L.A.S.S. <span class="mono">v1.0</span></span><span>LOCAL-FIRST · READ-ONLY · NO PAYLOAD TESTING</span></footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
