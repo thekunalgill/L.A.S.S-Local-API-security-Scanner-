@@ -1,5 +1,7 @@
 # L.A.S.S. (Local API Security Scanner)
 
+Local API Security Scanner (L.A.S.S.), a lightweight pre-deployment API health and security gatekeeper for local developer testing.
+
 L.A.S.S. is a local pre-deployment check for an API running on the same machine. It makes one read-only `GET` request, records response health and latency, checks a small set of baseline response headers, calculates a score out of 100, and saves the result for later comparison.
 
 This is a baseline health and configuration checker, not a penetration-testing or OWASP vulnerability scanner. It does not send attack payloads, crawl endpoints, test authentication, or follow redirects.
