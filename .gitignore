@@ -1,13 +1,15 @@
-.venv/
 __pycache__/
-.pytest_cache/
 *.py[cod]
+.venv/
 *.db
 *.sqlite
 *.sqlite3
+.pytest_cache/
+build/
+dist/
+*.spec.bak
 .env
 .env.*
-!.env.example
 *.pem
 *.key
 *.p12
@@ -17,4 +19,3 @@ credentials*
 *.bak
 *.backup
 *.pdf
-package-lock.json

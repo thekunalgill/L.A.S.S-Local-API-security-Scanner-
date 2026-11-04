@@ -1,0 +1,103 @@
+name: Build desktop apps
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: LASS-Windows
+          - os: ubuntu-24.04
+            artifact: LASS-Linux
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Linux webview dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev python3-gi
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-desktop.txt
+      - name: Build executable
+        run: python -m PyInstaller --clean --noconfirm lass.spec
+      - name: Package Linux executable and Debian installer
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist/LASS-Linux
+          cp dist/LASS dist/LASS-Linux/LASS
+          tar -C dist -czf dist/LASS-Linux.tar.gz LASS-Linux
+          mkdir -p package/DEBIAN package/usr/bin package/usr/share/applications
+          cp dist/LASS package/usr/bin/LASS
+          chmod 755 package/usr/bin/LASS
+          cat > package/DEBIAN/control <<'EOF'
+          Package: lass
+          Version: 1.0.0
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Depends: libgtk-3-0t64, libwebkit2gtk-4.1-0, libgirepository-1.0-1, gir1.2-gtk-3.0, gir1.2-webkit2-4.1
+          Maintainer: L.A.S.S. contributors
+          Description: Local API Security Scanner desktop app
+           Scans local APIs and authorized private network services.
+          EOF
+          cat > package/usr/share/applications/lass.desktop <<'EOF'
+          [Desktop Entry]
+          Type=Application
+          Name=L.A.S.S.
+          Comment=Local API Security Scanner
+          Exec=/usr/bin/LASS
+          Terminal=false
+          Categories=Development;Security;
+          EOF
+          dpkg-deb --build --root-owner-group package dist/LASS-Linux-amd64.deb
+      - name: Upload Linux installers
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LASS-Linux
+          path: |
+            dist/LASS-Linux-amd64.deb
+            dist/LASS-Linux.tar.gz
+      - name: Download WebView2 bootstrapper
+        if: runner.os == 'Windows'
+        run: curl.exe --fail --location --output dist\WebView2Setup.exe https://go.microsoft.com/fwlink/p/?LinkId=2124703
+      - name: Install Inno Setup
+        if: runner.os == 'Windows'
+        run: choco install innosetup --yes --no-progress
+      - name: Build Windows setup installer
+        if: runner.os == 'Windows'
+        run: iscc installer\windows\LASS.iss
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: LASS-Windows
+          path: dist/LASS-Setup.exe
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: LASS-*
+          path: release-files
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release-files/*

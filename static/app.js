@@ -1,131 +1,122 @@
-const authPanel = document.querySelector("#auth-panel");
-const appShell = document.querySelector("#app-shell");
-const userChip = document.querySelector("#user-chip");
-const loginForm = document.querySelector("#login-form");
-const authError = document.querySelector("#auth-error");
-const logoutButton = document.querySelector("#logout-button");
 const form = document.querySelector("#scan-form");
 const targetInput = document.querySelector("#target");
+const authorization = document.querySelector("#authorized");
 const scanButton = document.querySelector("#scan-button");
 const formError = document.querySelector("#form-error");
-const resultPanel = document.querySelector("#result");
-const historyBody = document.querySelector("#history-body");
+const resultSection = document.querySelector("#result-section");
+const resultContainer = document.querySelector("#scan-result");
+const historyList = document.querySelector("#history-list");
+const historyKey = "lass.scanHistory.v1";
 
 function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  return String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[char]);
 }
 
-function formatTime(value) {
-  return new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-}
-
-function showLoggedIn(user) {
-  authPanel.hidden = true;
-  appShell.hidden = false;
-  userChip.textContent = `Signed in as ${user.username}`;
-  loadHistory().catch(() => {});
-}
-
-function showLoggedOut() {
-  authPanel.hidden = false;
-  appShell.hidden = true;
-  resultPanel.hidden = true;
-  historyBody.innerHTML = '<tr><td class="empty-state" colspan="6">You need to sign in to view scan history.</td></tr>';
-}
-
-async function checkSession() {
-  const response = await fetch("/api/auth/me", { credentials: "same-origin" });
-  if (!response.ok) {
-    showLoggedOut();
-    return;
-  }
-  const user = await response.json();
-  showLoggedIn(user);
+function renderFindings(findings) {
+  if (!findings.length) return '<div class="success-message">No baseline issues detected. The endpoint responded successfully.</div>';
+  return `<div class="findings">${findings.map((finding) => `
+    <article class="finding">
+      <span class="severity ${escapeHtml(finding.severity)}">${escapeHtml(finding.severity)}</span>
+      <div><h3>${escapeHtml(finding.title)}</h3><p>${escapeHtml(finding.detail)}</p>
+      <p class="recommendation"><strong>Fix:</strong> ${escapeHtml(finding.recommendation)}</p></div>
+    </article>`).join("")}</div>`;
 }
 
 function renderResult(scan) {
-  const findings = scan.findings.length
-    ? scan.findings.map((item) => `<article class="finding"><span class="severity ${escapeHtml(item.severity)}">${escapeHtml(item.severity)} −${item.deduction}</span><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.detail)}</p><p>↳ ${escapeHtml(item.recommendation)}</p></div></article>`).join("")
-    : '<article class="finding"><span class="severity low">clear</span><div><strong>No baseline issues found</strong><p>This response passed the checks included in this scan.</p></div></article>';
-  resultPanel.innerHTML = `<div class="result-top"><div><span class="result-label">SCAN #${scan.id} · ${escapeHtml(scan.target)}</span><h3>Baseline report</h3></div><div class="score">${scan.score}<small> / 100</small></div></div><div class="result-meta"><span>HTTP ${scan.status_code ?? "NO RESPONSE"}</span><span>${scan.latency_ms == null ? "—" : `${scan.latency_ms} ms`}</span><span>${formatTime(scan.created_at)}</span></div><div class="findings">${findings}</div>`;
-  resultPanel.hidden = false;
-  resultPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
-
-async function loadHistory() {
-  const response = await fetch("/api/history", { credentials: "same-origin" });
-  if (!response.ok) throw new Error("Could not load scan history.");
-  const scans = await response.json();
-  if (!scans.length) {
-    historyBody.innerHTML = '<tr><td class="empty-state" colspan="6">No scans yet. Start with a local endpoint above.</td></tr>';
+  resultSection.hidden = false;
+  document.querySelector("#scan-time").textContent = new Date(scan.timestamp).toLocaleString();
+  if (scan.status === "failed") {
+      resultContainer.innerHTML = '<div class="result-card"><div class="error-message">Could not reach this endpoint. Check that the service is available and try again.</div></div>';
     return;
   }
-  historyBody.innerHTML = scans.map((scan) => `<tr><td class="target" title="${escapeHtml(scan.target)}">${escapeHtml(scan.target)}</td><td><span class="status-pill ${scan.status_code == null || scan.status_code >= 400 ? "bad" : ""}">${scan.status_code ?? "ERR"}</span></td><td>${scan.latency_ms == null ? "—" : `${scan.latency_ms} ms`}</td><td class="score-cell">${scan.score}</td><td>${formatTime(scan.created_at)}</td><td><button class="details-button" data-scan-id="${scan.id}" title="View scan findings" aria-label="View scan findings">↗</button></td></tr>`).join("");
+  const scoreClass = scan.score >= 80 ? "" : scan.score >= 55 ? "medium" : "low";
+  resultContainer.innerHTML = `<div class="result-card">
+    <div class="result-top">
+      <div class="score-block"><div class="score-ring ${scoreClass}">${scan.score}</div><div class="score-caption">BASELINE SCORE<small>OUT OF 100</small></div></div>
+      <div class="metrics"><div class="metric"><strong>${scan.status_code}</strong><small>HTTP STATUS</small></div><div class="metric"><strong>${Number(scan.latency_ms).toFixed(0)}<small style="display:inline"> ms</small></strong><small>RESPONSE TIME</small></div><div class="metric"><strong>Online</strong><small>ENDPOINT STATUS</small></div></div>
+    </div>${renderFindings(scan.findings)}</div>`;
 }
 
-loginForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  authError.hidden = true;
-  const username = document.querySelector("#login-username").value.trim();
-  const password = document.querySelector("#login-password").value;
+function readHistory() {
   try {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.detail || "Login failed.");
-    await checkSession();
-  } catch (error) {
-    authError.textContent = error.message || "Unable to sign in.";
-    authError.hidden = false;
+    const scans = JSON.parse(localStorage.getItem(historyKey) || "[]");
+    return Array.isArray(scans) ? scans : [];
+  } catch {
+    return [];
   }
-});
+}
 
-logoutButton.addEventListener("click", async () => {
-  await fetch("/api/auth/logout", {
-    method: "POST",
-    credentials: "same-origin",
-  });
-  showLoggedOut();
-});
+function saveScan(scan) {
+  try {
+    localStorage.setItem(historyKey, JSON.stringify([scan, ...readHistory()].slice(0, 20)));
+  } catch {
+    // Scanning still works when browser storage is unavailable.
+  }
+}
+
+function loadHistory() {
+  const scans = readHistory();
+  if (!scans.length) {
+    historyList.innerHTML = '<div class="empty-state">Your scan history is saved in this browser.</div>';
+    return;
+  }
+  try {
+    historyList.innerHTML = scans.map((scan) => `<div class="history-row">
+      <span class="endpoint" title="${escapeHtml(scan.target_url)}">${escapeHtml(scan.target_url)}</span>
+      <span class="status-pill ${scan.status === "failed" ? "failed" : ""}">${scan.status === "failed" ? "FAILED" : `HTTP ${scan.status_code}`}</span>
+      <span class="history-score">${scan.score === null ? "—" : scan.score}</span>
+      <span class="history-date">${new Date(scan.timestamp).toLocaleString()}</span>
+    </div>`).join("");
+  } catch {
+    historyList.innerHTML = '<div class="empty-state">History could not be displayed.</div>';
+  }
+}
+
+async function loadConfig() {
+  try {
+    const response = await fetch("/api/config");
+    if (!response.ok || !(await response.json()).web_mode) return;
+    document.querySelector(".local-badge").innerHTML = "<i></i> HOSTED SCAN MODE";
+    document.querySelector(".hero > p").textContent = "Check the health, response time and basic security posture of a public API.";
+    document.querySelector(".scan-card h2").textContent = "Start a public API scan";
+    targetInput.placeholder = "https://api.example.com/health";
+    targetInput.value = "";
+    document.querySelector(".input-foot span").textContent = "Public IP addresses and hostnames only. Private networks are blocked.";
+    document.querySelector(".safe-note").textContent = "PUBLIC TARGETS ONLY";
+    document.querySelector(".browser-note").textContent = "Scans run from the hosted service and are limited to public IP addresses. Only scan systems you own or have permission to test.";
+  } catch {
+    // The local desktop UI remains usable if the optional config request fails.
+  }
+}
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   formError.hidden = true;
-  resultPanel.hidden = true;
   scanButton.disabled = true;
-  scanButton.querySelector("span").textContent = "Scanning…";
+  scanButton.innerHTML = "<span>Scanning…</span><span aria-hidden=\"true\">◌</span>";
   try {
+    if (!authorization.checked) throw new Error("Confirm that you own or are authorized to test this target.");
     const response = await fetch("/api/scans", {
       method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ target: targetInput.value.trim() }),
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({target_url: targetInput.value})
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.detail ?? "Scan failed.");
+    if (!response.ok) throw new Error(data.detail || "The scan request failed.");
+    saveScan(data);
     renderResult(data);
-    await loadHistory();
+    loadHistory();
   } catch (error) {
-    formError.textContent = error.message || "Could not reach the scanner.";
+    formError.textContent = error.message;
     formError.hidden = false;
   } finally {
     scanButton.disabled = false;
-    scanButton.querySelector("span").textContent = "Run scan";
+    scanButton.innerHTML = "<span>Run scan</span><span aria-hidden=\"true\">↗</span>";
   }
 });
 
-historyBody.addEventListener("click", async (event) => {
-  const button = event.target.closest("[data-scan-id]");
-  if (!button) return;
-  const response = await fetch(`/api/scans/${button.dataset.scanId}`, { credentials: "same-origin" });
-  if (response.ok) renderResult(await response.json());
-});
-
-document.querySelector("#refresh-button").addEventListener("click", () => loadHistory().catch(() => {}));
-checkSession();
+document.querySelector("#refresh-button").addEventListener("click", loadHistory);
+loadConfig();
+loadHistory();
