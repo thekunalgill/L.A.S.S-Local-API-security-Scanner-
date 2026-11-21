@@ -9,6 +9,18 @@ body{margin:0;background:radial-gradient(ellipse at 52% -30%,#203452 0,transpare
 .local-badge,.eyebrow,.section-tag,.safe-note,.history-head,footer,.input-foot{font:500 10px "DM Mono",monospace;letter-spacing:.1em}
 .local-badge{border:1px solid #255344;color:#8ae4c4;padding:8px 11px;border-radius:20px;font-size:9px}
 .local-badge i,.eyebrow span{display:inline-block;width:6px;height:6px;background:#51d5a9;border-radius:50%;margin:0 6px 1px 0;box-shadow:0 0 10px #51d5a9}
+.agent-row{display:flex;align-items:center;justify-content:space-between;margin:-3px 0 17px;padding-bottom:13px;border-bottom:1px solid var(--line)}
+.agent-status{display:flex;align-items:center;gap:8px;color:#aab8ca;font-size:11px}
+.agent-status i{width:8px;height:8px;border-radius:50%;background:#8793a4}
+.agent-status[data-state="connected"]{color:#8ae4c4}
+.agent-status[data-state="connected"] i{background:#51d5a9;box-shadow:0 0 9px #51d5a9}
+.agent-status[data-state="offline"]{color:#ff9eaa}
+.agent-status[data-state="offline"] i{background:#fb7185}
+.agent-status[data-state="checking"] i{background:#f3c56b}
+.agent-help{margin:-3px 0 16px;padding:12px 14px;border-left:2px solid #f3c56b;background:#242316;color:#d4cca6;font-size:11px;line-height:1.65}
+.agent-help p+p{margin-top:7px}
+.agent-help code{color:#f3d982;font:11px "DM Mono",monospace}
+#agent-token{display:block;width:100%;margin-bottom:20px}
 main{max-width:830px;margin:0 auto}
 .hero{padding:68px 0 34px}
 .eyebrow,.section-tag{color:#7e91a9}

@@ -3,9 +3,6 @@ from __future__ import annotations
 from typing import Any
 
 
-DEDUCTIONS = {"high": 20, "medium": 10, "low": 5}
-
-
 def analyze_response(
     status_code: int, headers: Any, is_https: bool
 ) -> list[dict[str, str]]:
@@ -101,7 +98,3 @@ def analyze_response(
                 }
             )
     return findings
-
-
-def score_findings(findings: list[dict[str, str]]) -> int:
-    return max(0, 100 - sum(DEDUCTIONS.get(item["severity"], 0) for item in findings))

@@ -1,0 +1,8 @@
+index.py
+desktop.py
+lass/
+tests/
+requirements*.txt
+*.spec
+build/
+dist/

@@ -1,8 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "index.py": {
-      "includeFiles": "static/**"
-    }
-  }
+  "outputDirectory": "static"
 }

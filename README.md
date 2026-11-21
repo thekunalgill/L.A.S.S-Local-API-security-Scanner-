@@ -1,57 +1,58 @@
-# L.A.S.S. — API Security Scanner
+# L.A.S.S. — Local API Security Scanner
 
-L.A.S.S. provides a web interface and desktop app for checking API response health and baseline security headers. The web app is stateless and needs no account, database, or Vercel environment variables. Scan history is stored in the user's browser. Desktop scans can target localhost and authorized private LAN hosts; hosted scans are restricted to public IP addresses.
+L.A.S.S. checks the response health and baseline security headers of local APIs. The Vercel deployment serves only the static web interface. All scans run through a FastAPI agent on your own computer, and the server rejects public IP addresses and public hostnames.
 
-## Deploy from GitHub to Vercel
+## Run the local agent
 
-1. Push this repository to GitHub and import it in Vercel. The root `index.py` entrypoint serves the FastAPI app, and `vercel.json` includes the static frontend assets.
-2. Deploy with Vercel's default settings. No database, credentials, or environment variables are required.
-
-Hosted scans accept public IP addresses and hostnames that resolve only to public IPs. Private, loopback, and link-local destinations are blocked, and redirects are not followed. The authorization checkbox is a reminder, not access control; only scan systems you own or have permission to test. History stays in the current browser and is not shared across browsers or devices. Vercel serverless functions are intended for these short, single-request checks, not long-running scans.
-
-## Build or run the desktop app
-
-Python 3.10 or newer is required for development.
+Python 3.10 or newer is required. From the repository directory:
 
 ```bash
 python -m venv .venv
-# Linux:
+# Linux/macOS:
 source .venv/bin/activate
 # Windows PowerShell:
 # .venv\Scripts\Activate.ps1
-python -m pip install -r requirements-desktop.txt
-python desktop.py
+python -m pip install -r requirements.txt
+./run-agent.sh
 ```
 
-Linux requires GTK 3, WebKitGTK 4.1, and the matching PyGObject (`python3-gi`) runtime. For development builds, install their development packages. On Ubuntu 24.04:
+On Windows, start it with `python -m lass.agent` if the shell does not run the `.sh` script. The agent binds only to `127.0.0.1:8765`; it is not exposed as a network server. On startup it prints a random pairing token in the terminal. Keep that terminal open while scanning.
+
+You can also run the agent directly with `python -m lass.agent`. Scan history is stored in SQLite at `~/.local/share/lass/scans.sqlite3` (or `%USERPROFILE%\\.local\\share\\lass\\scans.sqlite3` on Windows). Set `LASS_DB_PATH` to choose another database file. Set `LASS_ALLOWED_ORIGIN` if your Vercel site has a different exact origin; the default is `https://l-a-s-s-local-api-security-scanner.vercel.app`.
+
+## Open the web interface
+
+Deploy the repository to Vercel using the default static deployment configuration. Vercel serves only the files in `static/`; it has no scan function and cannot scan targets. Open your deployed Vercel URL, confirm the browser's local-network permission if prompted, paste the pairing token printed by the running agent, and check that the status reads **Agent connected**.
+
+For local development, serve the static files from an allowed localhost origin:
 
 ```bash
-sudo apt install libgtk-3-dev libwebkit2gtk-4.1-dev python3-gi
+python -m http.server 8000 --directory static
 ```
 
-On Arch Linux and derivatives, install `gtk3`, `webkit2gtk-4.1`, and `python-gobject` with pacman. Windows uses Microsoft Edge WebView2; install its Evergreen Runtime if it is not already present.
+Then open `http://localhost:8000`. Start the agent separately. The UI also includes a **Check agent** control and setup steps when the agent is unavailable.
 
-## Build desktop binaries
+## Pairing and scan behavior
 
-Build on the operating system for which you want a binary; Windows and Linux builds are not cross-compiled.
+Paste the terminal token into the UI once per browser tab/session. It is held in `sessionStorage` (or memory when storage is unavailable) and sent in the `X-LASS-Token` header. The token changes every time the agent restarts. Scan requests also require the authorization confirmation checkbox; the agent enforces it independently of the UI.
+
+Only HTTP and HTTPS URLs with `localhost`, `127.0.0.1`, `::1`, or addresses in `10.0.0.0/8`, `172.16.0.0/12`, and `192.168.0.0/16` are accepted. Hostnames are resolved and every returned address must be in the allowlist. Public targets are rejected before HTTPX is called. The agent makes one GET request, does not follow redirects, uses an eight-second timeout, and allows at most 10 scans per minute per client. Successful and failed connection results are saved to SQLite and returned in Recent scans.
+
+The report shows HTTP status, response time, and a 100-point baseline score. Findings cover common missing security headers, wildcard CORS, server errors, and technology disclosure. High, medium, and low findings deduct 20, 10, and 5 points respectively. L.A.S.S. is a lightweight developer baseline, not a full OWASP scanner or a substitute for an authorized security assessment.
+
+## Browser permissions and troubleshooting
+
+- **Chrome Local Network Access:** Current Chrome is rolling out a Local Network Access permission (Chrome 142). When the Vercel page requests the local agent, choose **Allow** in the browser prompt. If it was denied, open the Vercel site's controls or Site settings, set **Local network access** to **Allow**, then reload. The permission is available to secure contexts such as the HTTPS Vercel site. See [Chrome's Local Network Access announcement](https://developer.chrome.com/blog/local-network-access/).
+- **Agent not running:** Start `python -m lass.agent`, leave its terminal open, then click **Check agent**. Confirm that port `8765` is available and the agent prints its pairing token.
+- **Pairing or 401 error:** Paste the token from the current agent process. Restarting the process creates a new token. The UI sends it only to `127.0.0.1` and keeps it for the current browser session.
+- **CORS / origin denied:** Use the deployed Vercel origin configured in `LASS_ALLOWED_ORIGIN`, or serve the UI from `http://localhost` for development. Other origins are deliberately rejected. Restart the agent after changing `LASS_ALLOWED_ORIGIN`.
+- **Safari or mixed-content error:** Some browser/OS combinations may block an HTTPS page from reaching an HTTP loopback service or may handle local-network permission differently. Try the localhost development UI (`http://localhost:8000`) in Safari, or use a current Chrome/Edge release and allow its Local Network Access prompt. Do not expose the agent on a LAN interface to work around browser restrictions.
+- **Target rejected:** Check that the URL uses `http://` or `https://`, has no credentials, and is a loopback/private IPv4 target. Public IPs and hostnames resolving to any public IP are intentionally blocked.
+
+## Tests
 
 ```bash
-python -m pip install -r requirements-desktop.txt
-python -m PyInstaller --clean --noconfirm lass.spec
+python -m pytest
 ```
 
-The executable will be in `dist/`. Releases tagged `v*` are built by GitHub Actions on native Windows and Linux runners and attached to the GitHub Release. Linux users need GTK 3 and WebKitGTK 4.1 installed on their system; Windows users need the Edge WebView2 Runtime.
-
-## Use the desktop app
-
-Enter a URL such as `http://localhost:8000/health`, `http://127.0.0.1:8000/`, or a private LAN IP address, then confirm that you are authorized to test it. Public IPs, domain names, redirects, and URL credentials are blocked. Local-network scans are only for machines you own or have explicit permission to assess. The scanner makes one GET request, with an eight-second timeout, and does not follow redirects. Hosted scans allow public hosts only and pin each connection to the public address validated by DNS.
-
-The tool checks response time, HTTP status, common security headers, wildcard CORS and technology disclosure, then deducts 20/10/5 points per high/medium/low finding from a score of 100. Scan history is stored locally in the browser's storage.
-
-This is a lightweight developer baseline, not a full OWASP scanner or a substitute for security testing.
-
-## Development tests
-
-```bash
-python -m unittest discover -s tests -v
-```
+The tests cover the target gate, hostname resolution, agent-origin and pairing controls, storage, and scoring.

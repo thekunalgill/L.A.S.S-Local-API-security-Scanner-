@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class ScanRequest(BaseModel):
     target_url: str = Field(min_length=1, max_length=2048)
+    authorized: bool = False
 
 
 class ScanResponse(BaseModel):
